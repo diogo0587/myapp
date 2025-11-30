@@ -241,11 +241,11 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
   String _formatTimestamp(int timestamp) {
     if (timestamp == 0) return '';
     final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
-    return '${date.day.toString().padLeft(2, '0')}/'
-        '${date.month.toString().padLeft(2, '0')}/'
+    return '${date.day.toString().padLeft(2, "0")}/'
+        '${date.month.toString().padLeft(2, "0")}/'
         '${date.year} '
-        '${date.hour.toString().padLeft(2, '0')}:'
-        '${date.minute.toString().padLeft(2, '0')}';
+        '${date.hour.toString().padLeft(2, "0")}:'
+        '${date.minute.toString().padLeft(2, "0")}';
   }
 
   @override
@@ -506,11 +506,11 @@ class NotificationDetailScreen extends StatelessWidget {
   String _formatTimestamp(int timestamp) {
     if (timestamp == 0) return '';
     final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
-    return '${date.day.toString().padLeft(2, '0')}/'
-        '${date.month.toString().padLeft(2, '0')}/'
+    return '${date.day.toString().padLeft(2, "0")}/'
+        '${date.month.toString().padLeft(2, "0")}/'
         '${date.year} '
-        '${date.hour.toString().padLeft(2, '0')}:'
-        '${date.minute.toString().padLeft(2, '0')}';
+        '${date.hour.toString().padLeft(2, "0")}:'
+        '${date.minute.toString().padLeft(2, "0")}';
   }
 
   @override
@@ -599,7 +599,5 @@ class NotificationDetailScreen extends StatelessWidget {
         ),
       ),
     );
- _code }new
-</}
- }
+  }
 }
