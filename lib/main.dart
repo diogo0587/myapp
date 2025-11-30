@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io' show Platform;
 
 void main() {
   runApp(
@@ -133,6 +134,7 @@ class NotificationListScreen extends StatefulWidget {
 
 class _NotificationListScreenState extends State<NotificationListScreen> {
   static const _notificationChannel = EventChannel('com.example.myapp/notifications');
+  static const _permissionChannel = MethodChannel('com.example.myapp/permissions');
 
   @override
   void initState() {
@@ -141,6 +143,54 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
       final notification = NotificationModel.fromMap(Map<String, dynamic>.from(event));
       Provider.of<NotificationProvider>(context, listen: false).addNotification(notification);
     });
+
+    _checkAndRequestNotificationAccess();
+  }
+
+  Future<void> _checkAndRequestNotificationAccess() async {
+    if (!Platform.isAndroid) return;
+    try {
+      final bool isGranted =
+          await _permissionChannel.invokeMethod<bool>('isNotificationAccessGranted') ?? false;
+      if (!isGranted && mounted) {
+        _showPermissionDialog();
+      }
+    } on PlatformException {
+      // Ignore errors and don't block UI
+    }
+  }
+
+  Future<void> _showPermissionDialog() async {
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Permitir acesso às notificações'),
+          content: const Text(
+            'Para que o app possa listar e salvar notificações, '
+            'é necessário conceder acesso às notificações nas configurações do sistema.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Agora não'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                try {
+                  await _permissionChannel.invokeMethod('openNotificationSettings');
+                } on PlatformException {
+                  // Silenciar, o máximo que fizemos foi tentar abrir as configurações
+                }
+              },
+              child: const Text('Abrir configurações'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
