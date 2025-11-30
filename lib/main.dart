@@ -114,11 +114,56 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: Colors.deepPurple,
+      brightness: Brightness.dark,
+    );
+
     return MaterialApp(
       title: 'Notification Saver',
+      themeMode: ThemeMode.dark,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: colorScheme,
         useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFF050816),
+        appBarTheme: AppBarTheme(
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          foregroundColor: colorScheme.onBackground,
+          centerTitle: true,
+          titleTextStyle: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        cardTheme: CardTheme(
+          color: const Color(0xFF111827),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: 0,
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFF0B1120),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(24),
+            borderSide: const BorderSide(color: Colors.transparent),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(24),
+            borderSide: const BorderSide(color: Colors.transparent),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(24),
+            borderSide: BorderSide(color: colorScheme.primary, width: 1.2),
+          ),
+          hintStyle: TextStyle(color: Colors.grey.shade500),
+        ),
+        listTileTheme: const ListTileThemeData(
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        ),
       ),
       home: const NotificationListScreen(),
     );
@@ -193,37 +238,49 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
     );
   }
 
+  String _formatTimestamp(int timestamp) {
+    if (timestamp == 0) return '';
+    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/'
+        '${date.year} '
+        '${date.hour.toString().padLeft(2, '0')}:'
+        '${date.minute.toString().padLeft(2, '0')}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<NotificationProvider>(context);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Saved Notifications'),
+        title: const Text('Notification Saver'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.delete_sweep),
-            tooltip: 'Clear all notifications',
+            icon: const Icon(Icons.delete_sweep_rounded),
+            tooltip: 'Limpar todas',
             onPressed: () {
               if (provider.notifications.isEmpty) return;
               showDialog(
                 context: context,
                 builder: (BuildContext context) {
                   return AlertDialog(
-                    title: const Text('Clear all'),
-                    content: const Text('Delete all saved notifications?'),
+                    backgroundColor: const Color(0xFF020617),
+                    title: const Text('Limpar todas as notificações'),
+                    content: const Text('Deseja mesmo remover todas as notificações salvas?'),
                     actions: <Widget>[
                       TextButton(
-                        child: const Text('Cancel'),
+                        child: const Text('Cancelar'),
                         onPressed: () {
                           Navigator.of(context).pop();
                         },
                       ),
                       TextButton(
-                        child: const Text('Delete'),
+                        child: const Text('Limpar'),
                         onPressed: () {
-                          Provider.of<NotificationProvider>(context, listen: false)
-                              .clearAll();
+                          Provider.of<NotificationProvider>(context, listen: false).clearAll();
                           Navigator.of(context).pop();
                         },
                       ),
@@ -235,20 +292,25 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
           )
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(kToolbarHeight),
+          preferredSize: const Size.fromHeight(kToolbarHeight + 12),
           child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              onChanged: (value) {
-                provider.setSearchQuery(value);
-              },
-              decoration: InputDecoration(
-                hintText: 'Search notifications...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20.0),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    onChanged: (value) {
+                      provider.setSearchQuery(value);
+                    },
+                    style: const TextStyle(fontSize: 14),
+                    decoration: const InputDecoration(
+                      hintText: 'Buscar por app, título ou conteúdo',
+                      prefixIcon: Icon(Icons.search_rounded, size: 20),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ),
@@ -256,54 +318,176 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
       body: Consumer<NotificationProvider>(
         builder: (context, provider, child) {
           if (provider.notifications.isEmpty) {
-            return const Center(
-              child: Text('No notifications saved yet. Grant notification access in settings.'),
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.notifications_off_outlined,
+                      size: 64,
+                      color: Colors.grey.shade600,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Nenhuma notificação salva ainda',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Conceda acesso às notificações e use o aparelho normalmente. '
+                      'As notificações que chegarem serão listadas aqui.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade400,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
             );
           }
           return ListView.builder(
+            padding: const EdgeInsets.only(top: 8, bottom: 16),
             itemCount: provider.notifications.length,
             itemBuilder: (context, index) {
               final notification = provider.notifications[index];
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                child: ListTile(
-                  title: Text(notification.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text(notification.body, maxLines: 2, overflow: TextOverflow.ellipsis),
-                  trailing: Text(notification.appName),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => NotificationDetailScreen(notification: notification),
+              final ts = _formatTimestamp(notification.timestamp);
+              return GestureDetector(
+                onLongPress: () {
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return AlertDialog(
+                        backgroundColor: const Color(0xFF020617),
+                        title: const Text('Excluir notificação'),
+                        content: const Text('Deseja remover esta notificação?'),
+                        actions: <Widget>[
+                          TextButton(
+                            child: const Text('Cancelar'),
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                            },
+                          ),
+                          TextButton(
+                            child: const Text('Excluir'),
+                            onPressed: () {
+                              provider.removeNotificationAt(index);
+                              Navigator.of(context).pop();
+                            },
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+                child: Card(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => NotificationDetailScreen(notification: notification),
+                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: [
+                                  colorScheme.primary,
+                                  colorScheme.secondary,
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              notification.appName.isNotEmpty
+                                  ? notification.appName[0].toUpperCase()
+                                  : '?',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        notification.appName,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (ts.isNotEmpty) ...[
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        ts,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade400,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  notification.title.isNotEmpty
+                                      ? notification.title
+                                      : '(Sem título)',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 14,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  notification.body,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade300,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    );
-                  },
-                  onLongPress: () {
-                    showDialog(
-                      context: context,
-                      builder: (BuildContext context) {
-                        return AlertDialog(
-                          title: const Text('Delete Notification'),
-                          content: const Text('Are you sure you want to delete this notification?'),
-                          actions: <Widget>[
-                            TextButton(
-                              child: const Text('Cancel'),
-                              onPressed: () {
-                                Navigator.of(context).pop();
-                              },
-                            ),
-                            TextButton(
-                              child: const Text('Delete'),
-                              onPressed: () {
-                                provider.removeNotificationAt(index);
-                                Navigator.of(context).pop();
-                              },
-                            ),
-                          ],
-                        );
-                      },
-                    );
-                  },
+                    ),
+                  ),
                 ),
               );
             },
@@ -332,30 +516,90 @@ class NotificationDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ts = _formatTimestamp(notification.timestamp);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(notification.appName),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (ts.isNotEmpty)
-              Text(
-                ts,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            const SizedBox(height: 8.0),
-            Text(
-              notification.title,
-              style: Theme.of(context).textTheme.headlineSmall,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Color(0xFF020617),
+              Color(0xFF020617),
+              Color(0xFF0F172A),
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(18.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (ts.isNotEmpty)
+                  Text(
+                    ts,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.grey.shade400,
+                    ),
+                  ),
+                const SizedBox(height: 12.0),
+                Text(
+                  notification.title.isNotEmpty
+                      ? notification.title
+                      : '(Sem título)',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 16.0),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0B1120),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.notifications_rounded,
+                        size: 18,
+                        color: colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        notification.appName,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24.0),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Text(
+                      notification.body,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16.0),
-            Text(notification.body),
-          ],
+          ),
         ),
       ),
     );
-  }
+ _code }new
+</}
+ }
 }
