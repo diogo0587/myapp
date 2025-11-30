@@ -13,16 +13,25 @@ class NotificationListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         super.onNotificationPosted(sbn)
+
+        // Garante que não vamos salvar notificações do próprio app
+        val packageNamePosted = sbn?.packageName ?: ""
+        if (packageNamePosted == packageName) {
+            return
+        }
+
         val notification = sbn?.notification
         if (notification != null) {
             val title = notification.extras.getString(Notification.EXTRA_TITLE) ?: ""
             val text = notification.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
-            val appName = sbn.packageName ?: ""
+            val appName = packageNamePosted
+            val timestamp = sbn.postTime
 
             val notificationData = mapOf(
                 "title" to title,
                 "body" to text,
-                "appName" to appName
+                "appName" to appName,
+                "timestamp" to timestamp
             )
             eventHandler?.sendEvent(notificationData)
         }
