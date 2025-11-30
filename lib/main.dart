@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io' show Platform;
+import 'package:http/http.dart' as http;
 
 void main() {
   runApp(
@@ -54,6 +55,8 @@ class NotificationProvider with ChangeNotifier {
   String _searchQuery = '';
   String _appFilter = '';
   bool _captureEnabled = true;
+  String? _notionToken;
+  String? _notionDatabaseId;
 
   List<NotificationModel> get notifications {
     Iterable<NotificationModel> list = _notifications;
@@ -89,6 +92,8 @@ class NotificationProvider with ChangeNotifier {
 
   String get appFilter => _appFilter;
   bool get captureEnabled => _captureEnabled;
+  String? get notionToken => _notionToken;
+  String? get notionDatabaseId => _notionDatabaseId;
 
   NotificationProvider() {
     _loadState();
@@ -97,6 +102,7 @@ class NotificationProvider with ChangeNotifier {
   void _loadState() {
     loadNotifications();
     _loadCaptureEnabled();
+    _loadNotionConfig();
   }
 
   void addNotification(NotificationModel notification) {
@@ -158,6 +164,34 @@ class NotificationProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _captureEnabled = prefs.getBool('captureEnabled') ?? true;
     notifyListeners();
+  }
+
+  Future<void> _loadNotionConfig() async {
+    final prefs = await SharedPreferences.getInstance();
+    _notionToken = prefs.getString('notionToken');
+    _notionDatabaseId = prefs.getString('notionDatabaseId');
+    notifyListeners();
+  }
+
+  Future<void> setNotionConfig({
+    required String? token,
+    required String? databaseId,
+  }) async {
+    _notionToken = (token ?? '').trim().isEmpty ? null : token!.trim();
+    _notionDatabaseId =
+        (databaseId ?? '').trim().isEmpty ? null : databaseId!.trim();
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    if (_notionToken != null) {
+      await prefs.setString('notionToken', _notionToken!);
+    } else {
+      await prefs.remove('notionToken');
+    }
+    if (_notionDatabaseId != null) {
+      await prefs.setString('notionDatabaseId', _notionDatabaseId!);
+    } else {
+      await prefs.remove('notionDatabaseId');
+    }
   }
 }
 
@@ -735,8 +769,146 @@ class NotificationDetailScreen extends StatelessWidget {
   }
 }
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  late TextEditingController _tokenController;
+  late TextEditingController _databaseController;
+  bool _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      final provider = Provider.of<NotificationProvider>(context);
+      _tokenController =
+          TextEditingController(text: provider.notionToken ?? '');
+      _databaseController =
+          TextEditingController(text: provider.notionDatabaseId ?? '');
+      _initialized = true;
+    }
+  }
+
+  @override
+  void dispose() {
+    _tokenController.dispose();
+    _databaseController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _exportLast24hToNotion(
+    BuildContext context,
+    NotificationProvider provider,
+  ) async {
+    final token = provider.notionToken;
+    final dbId = provider.notionDatabaseId;
+
+    if (token == null || token.isEmpty || dbId == null || dbId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Configure o token e o database ID do Notion antes de exportar.'),
+        ),
+      );
+      return;
+    }
+
+    final now = DateTime.now();
+    final cutoff = now.subtract(const Duration(hours: 24)).millisecondsSinceEpoch;
+    final items = provider.notifications
+        .where((n) => n.timestamp >= cutoff)
+        .toList();
+
+    if (items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nenhuma notificação das últimas 24h para exportar.'),
+        ),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content:
+            Text('Exportando ${items.length} notificações para o Notion...'),
+      ),
+    );
+
+    int success = 0;
+    int fail = 0;
+
+    for (final n in items) {
+      final body = n.body;
+      final title = n.title.isNotEmpty ? n.title : '(Sem título)';
+      final appName = n.appName;
+      final ts = DateTime.fromMillisecondsSinceEpoch(n.timestamp);
+      final iso = ts.toUtc().toIso8601String();
+
+      final payload = {
+        'parent': {'database_id': dbId},
+        'properties': {
+          'Name': {
+            'title': [
+              {
+                'text': {'content': title}
+              }
+            ]
+          },
+          'App': {
+            'rich_text': [
+              {
+                'text': {'content': appName}
+              }
+            ]
+          },
+          'Body': {
+            'rich_text': [
+              {
+                'text': {'content': body}
+              }
+            ]
+          },
+          'Timestamp': {
+            'date': {'start': iso}
+          },
+        },
+      };
+
+      try {
+        final response = await http.post(
+          Uri.parse('https://api.notion.com/v1/pages'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+            'Notion-Version': '2022-06-28',
+          },
+          body: json.encode(payload),
+        );
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          success++;
+        } else {
+          fail++;
+        }
+      } catch (_) {
+        fail++;
+      }
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Exportação concluída. Sucesso: $success, Falhas: $fail.',
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -762,10 +934,61 @@ class SettingsScreen extends StatelessWidget {
             },
           ),
           const SizedBox(height: 12),
+          Text(
+            'Integração com Notion',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _tokenController,
+            decoration: const InputDecoration(
+              labelText: 'Token da integração (Notion Internal Integration Token)',
+              hintText: 'secret_...',
+            ),
+            obscureText: true,
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _databaseController,
+            decoration: const InputDecoration(
+              labelText: 'ID da Database do Notion',
+              hintText: 'Cole aqui o database_id',
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              ElevatedButton.icon(
+                onPressed: () async {
+                  await provider.setNotionConfig(
+                    token: _tokenController.text,
+                    databaseId: _databaseController.text,
+                  );
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Configurações do Notion salvas.'),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.save_rounded),
+                label: const Text('Salvar Notion'),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: () => _exportLast24hToNotion(context, provider),
+                icon: const Icon(Icons.cloud_upload_outlined),
+                label: const Text('Exportar últimas 24h'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
           ListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text(
-              'Exportar histórico',
+              'Exportar histórico (manual)',
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
             subtitle: const Text(
