@@ -52,24 +52,55 @@ class NotificationModel {
 class NotificationProvider with ChangeNotifier {
   List<NotificationModel> _notifications = [];
   String _searchQuery = '';
+  String _appFilter = '';
+  bool _captureEnabled = true;
 
   List<NotificationModel> get notifications {
-    if (_searchQuery.isEmpty) {
-      return _notifications;
+    Iterable<NotificationModel> list = _notifications;
+
+    if (_appFilter.isNotEmpty) {
+      list = list.where(
+        (n) => n.appName.toLowerCase() == _appFilter.toLowerCase(),
+      );
     }
-    return _notifications
-        .where((n) =>
+
+    if (_searchQuery.isNotEmpty) {
+      list = list.where(
+        (n) =>
             n.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
             n.body.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-            n.appName.toLowerCase().contains(_searchQuery.toLowerCase()))
-        .toList();
+            n.appName.toLowerCase().contains(_searchQuery.toLowerCase()),
+      );
+    }
+
+    return list.toList();
   }
 
+  List<String> get appNames {
+    final set = <String>{};
+    for (final n in _notifications) {
+      if (n.appName.isNotEmpty) {
+        set.add(n.appName);
+      }
+    }
+    final list = set.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return list;
+  }
+
+  String get appFilter => _appFilter;
+  bool get captureEnabled => _captureEnabled;
+
   NotificationProvider() {
+    _loadState();
+  }
+
+  void _loadState() {
     loadNotifications();
+    _loadCaptureEnabled();
   }
 
   void addNotification(NotificationModel notification) {
+    if (!_captureEnabled) return;
     _notifications.insert(0, notification);
     saveNotifications();
     notifyListeners();
@@ -93,19 +124,40 @@ class NotificationProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void saveNotifications() async {
+  void setAppFilter(String appName) {
+    _appFilter = appName;
+    notifyListeners();
+  }
+
+  Future<void> setCaptureEnabled(bool enabled) async {
+    _captureEnabled = enabled;
+    notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    final notificationsList = _notifications.map((n) => json.encode(n.toMap())).toList();
+    await prefs.setBool('captureEnabled', enabled);
+  }
+
+  Future<void> saveNotifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    final notificationsList =
+        _notifications.map((n) => json.encode(n.toMap())).toList();
     await prefs.setStringList('notifications', notificationsList);
   }
 
-  void loadNotifications() async {
+  Future<void> loadNotifications() async {
     final prefs = await SharedPreferences.getInstance();
     final notificationsList = prefs.getStringList('notifications');
     if (notificationsList != null) {
-      _notifications = notificationsList.map((n) => NotificationModel.fromMap(json.decode(n))).toList();
+      _notifications = notificationsList
+          .map((n) => NotificationModel.fromMap(json.decode(n)))
+          .toList();
       notifyListeners();
     }
+  }
+
+  Future<void> _loadCaptureEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    _captureEnabled = prefs.getBool('captureEnabled') ?? true;
+    notifyListeners();
   }
 }
 
@@ -254,10 +306,25 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    final apps = provider.appNames;
+    final appFilter = provider.appFilter;
+    final captureEnabled = provider.captureEnabled;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Notification Saver'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_rounded),
+            tooltip: 'Configurações',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const SettingsScreen(),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.delete_sweep_rounded),
             tooltip: 'Limpar todas',
@@ -292,22 +359,58 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
           )
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(kToolbarHeight + 12),
+          preferredSize: const Size.fromHeight(kToolbarHeight + 44),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Row(
+            child: Column(
               children: [
-                Expanded(
-                  child: TextField(
-                    onChanged: (value) {
-                      provider.setSearchQuery(value);
-                    },
-                    style: const TextStyle(fontSize: 14),
-                    decoration: const InputDecoration(
-                      hintText: 'Buscar por app, título ou conteúdo',
-                      prefixIcon: Icon(Icons.search_rounded, size: 20),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        onChanged: (value) {
+                          provider.setSearchQuery(value);
+                        },
+                        style: const TextStyle(fontSize: 14),
+                        decoration: const InputDecoration(
+                          hintText: 'Buscar por app, título ou conteúdo',
+                          prefixIcon: Icon(Icons.search_rounded, size: 20),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                        ),
+                      ),
                     ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      captureEnabled ? Icons.play_circle_fill_rounded : Icons.pause_circle_filled_rounded,
+                      color: captureEnabled ? colorScheme.primary : Colors.grey.shade500,
+                      size: 26,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 32,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      FilterChip(
+                        label: const Text('Todos'),
+                        selected: appFilter.isEmpty,
+                        onSelected: (_) => provider.setAppFilter(''),
+                      ),
+                      for (final appName in apps)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: FilterChip(
+                            label: Text(
+                              appName,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            selected: appFilter.toLowerCase() == appName.toLowerCase(),
+                            onSelected: (_) => provider.setAppFilter(appName),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ],
@@ -522,6 +625,36 @@ class NotificationDetailScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(notification.appName),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.cloud_upload_outlined),
+            tooltip: 'Exportar JSON (para automações/Notion)',
+            onPressed: () {
+              final jsonPayload = json.encode(notification.toMap());
+              Clipboard.setData(ClipboardData(text: jsonPayload));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('JSON copiado. Use em automações ou APIs (ex.: Notion).'),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.copy_rounded),
+            tooltip: 'Copiar texto',
+            onPressed: () {
+              final text = [
+                if (ts.isNotEmpty) ts,
+                if (notification.title.isNotEmpty) notification.title,
+                if (notification.body.isNotEmpty) notification.body,
+              ].join('\n\n');
+              Clipboard.setData(ClipboardData(text: text));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Texto da notificação copiado')),
+              );
+            },
+          ),
+        ],
       ),
       body: Container(
         decoration: const BoxDecoration(
