@@ -1,0 +1,14 @@
+# Exemplo de configuração de assinatura para produção.
+# NÃO COMMITAR SENHAS REAIS NEM ESTE ARQUIVO PREENCHIDO.
+
+# Caminho absoluto para o keystore de produção (.jks)
+MYAPP_KEYSTORE_PATH=/caminho/absoluto/para/myapp-release-key.jks
+
+# Senha do keystore
+MYAPP_KEYSTORE_PASSWORD=sua_senha_keystore
+
+# Alias da chave dentro do keystore (informado ao criar a chave)
+MYAPP_KEY_ALIAS=myapp
+
+# Senha da chave (pode ser igual à do keystore)
+MYAPP_KEY_PASSWORD=sua_senha_chave
