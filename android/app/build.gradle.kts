@@ -26,9 +26,33 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            val keystorePath: String? = project.findProperty("MYAPP_KEYSTORE_PATH") as String?
+            val keystorePassword: String? = project.findProperty("MYAPP_KEYSTORE_PASSWORD") as String?
+            val keyAlias: String? = project.findProperty("MYAPP_KEY_ALIAS") as String?
+            val keyPassword: String? = project.findProperty("MYAPP_KEY_PASSWORD") as String?
+
+            if (keystorePath != null &&
+                keystorePassword != null &&
+                keyAlias != null &&
+                keyPassword != null
+            ) {
+                storeFile = file(keystorePath)
+                storePassword = keystorePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+            } else {
+                // Fallback para debug se as propriedades não estiverem definidas
+                signingConfigs.getByName("debug")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }
