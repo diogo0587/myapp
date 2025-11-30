@@ -51,7 +51,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Compatível com shrinkResources exigido pela toolchain atual.
+            // Se shrinkResources estiver ativo (configuração padrão do Flutter),
+            // o minify (R8) também precisa estar ativado.
+            isMinifyEnabled = true
             signingConfig = signingConfigs.getByName("release")
         }
     }
