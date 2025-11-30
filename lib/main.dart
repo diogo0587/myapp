@@ -18,14 +18,21 @@ class NotificationModel {
   final String title;
   final String body;
   final String appName;
+  final int timestamp;
 
-  NotificationModel({required this.title, required this.body, required this.appName});
+  NotificationModel({
+    required this.title,
+    required this.body,
+    required this.appName,
+    required this.timestamp,
+  });
 
   Map<String, dynamic> toMap() {
     return {
       'title': title,
       'body': body,
       'appName': appName,
+      'timestamp': timestamp,
     };
   }
 
@@ -34,6 +41,9 @@ class NotificationModel {
       title: map['title'] ?? '',
       body: map['body'] ?? '',
       appName: map['appName'] ?? '',
+      timestamp: map['timestamp'] is int
+          ? map['timestamp'] as int
+          : int.tryParse(map['timestamp']?.toString() ?? '') ?? 0,
     );
   }
 }
@@ -60,6 +70,12 @@ class NotificationProvider with ChangeNotifier {
 
   void addNotification(NotificationModel notification) {
     _notifications.insert(0, notification);
+    saveNotifications();
+    notifyListeners();
+  }
+
+  void clearAll() {
+    _notifications.clear();
     saveNotifications();
     notifyListeners();
   }
@@ -134,6 +150,40 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Saved Notifications'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_sweep),
+            tooltip: 'Clear all notifications',
+            onPressed: () {
+              if (provider.notifications.isEmpty) return;
+              showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return AlertDialog(
+                    title: const Text('Clear all'),
+                    content: const Text('Delete all saved notifications?'),
+                    actions: <Widget>[
+                      TextButton(
+                        child: const Text('Cancel'),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                      TextButton(
+                        child: const Text('Delete'),
+                        onPressed: () {
+                          Provider.of<NotificationProvider>(context, listen: false)
+                              .clearAll();
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          )
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(kToolbarHeight),
           child: Padding(
@@ -219,8 +269,19 @@ class NotificationDetailScreen extends StatelessWidget {
 
   const NotificationDetailScreen({super.key, required this.notification});
 
+  String _formatTimestamp(int timestamp) {
+    if (timestamp == 0) return '';
+    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/'
+        '${date.year} '
+        '${date.hour.toString().padLeft(2, '0')}:'
+        '${date.minute.toString().padLeft(2, '0')}';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final ts = _formatTimestamp(notification.timestamp);
     return Scaffold(
       appBar: AppBar(
         title: Text(notification.appName),
@@ -230,7 +291,16 @@ class NotificationDetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(notification.title, style: Theme.of(context).textTheme.headlineSmall),
+            if (ts.isNotEmpty)
+              Text(
+                ts,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            const SizedBox(height: 8.0),
+            Text(
+              notification.title,
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
             const SizedBox(height: 16.0),
             Text(notification.body),
           ],

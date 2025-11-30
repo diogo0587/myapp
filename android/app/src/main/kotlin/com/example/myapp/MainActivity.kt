@@ -9,8 +9,11 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        EventChannel(flutterEngine.dartExecutor.binaryMessenger, notificationChannel).setStreamHandler(
-            NotificationListener.eventHandler
-        )
+        val handler = NotificationEventHandler()
+        NotificationListener.eventHandler = handler
+        EventChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            notificationChannel
+        ).setStreamHandler(handler)
     }
 }
