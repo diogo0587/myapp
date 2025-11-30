@@ -734,3 +734,61 @@ class NotificationDetailScreen extends StatelessWidget {
     );
   }
 }
+
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = Provider.of<NotificationProvider>(context);
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Configurações'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          SwitchListTile(
+            title: const Text('Capturar notificações automaticamente'),
+            subtitle: const Text(
+              'Quando desativado, o app não salvará novas notificações, '
+              'mas o histórico atual permanece.',
+            ),
+            value: provider.captureEnabled,
+            onChanged: (value) {
+              provider.setCaptureEnabled(value);
+            },
+          ),
+          const SizedBox(height: 12),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text(
+              'Exportar histórico',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: const Text(
+              'Na tela de detalhes, você pode copiar a notificação em texto ou JSON. '
+              'Use o JSON em automações externas (ex.: integrações com Notion, Make, Zapier).',
+            ),
+          ),
+          const Divider(height: 24),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text(
+              'Sobre o app',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              'App para registrar e pesquisar notificações do sistema. '
+              'Ideal para criar históricos, relatórios ou integrações silenciosas '
+              'com outras plataformas.',
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
