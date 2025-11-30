@@ -601,4 +601,3 @@ class NotificationDetailScreen extends StatelessWidget {
     );
   }
 }
-}
